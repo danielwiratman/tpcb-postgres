@@ -12,9 +12,6 @@
 
 #define DSN "host=localhost port=5432 dbname=postgres user=daniel"
 
-PGconn *conn;
-PGresult *res;
-
 int num_fields;
 
 long tps = 1;
@@ -70,6 +67,7 @@ void init_database(int scaling_factor)
 
     PGconn *conn;
     conn = PQconnectdb(DSN);
+
     if (PQstatus(conn) != CONNECTION_OK)
     {
         fprintf(stderr, "Failed to connect : %s\n", PQerrorMessage(conn));
@@ -162,82 +160,92 @@ void init_database(int scaling_factor)
     }
 }
 
-long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta) {
-  error_exist = 'F';
+long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
+{
+    error_exist = 'F';
 
-  char *query;
-  query = malloc(sizeof(char) * 1000);
+    char *query;
+    query = malloc(sizeof(char) * 1000);
 
-  res = PQexec(myconn, "BEGIN");
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-    PQclear(res);
-    PQfinish(myconn);
-    exit(1);
-  }
-  sprintf(query, "UPDATE accounts SET Abalance=Abalance+%ld WHERE Aid=%ld",
-          delta, Aid);
-  res = PQexec(myconn, query);
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-    PQclear(res);
-    PQfinish(myconn);
-    exit(1);
-  }
-//   sprintf(query, "SELECT Abalance FROM accounts WHERE Aid=%ld", Aid);
-//   res = PQexec(myconn, query);
-//   if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-//     fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-//     PQclear(res);
-//     PQfinish(myconn);
-//     exit(1);
-//   }
-//   int numRows = PQntuples(res);
-//   for (int i = 0; i < numRows; i++) {
-//     char *value = PQgetvalue(res, i, 0);
-//     Abalance = atol(value);
-//   }
-  sprintf(query, "UPDATE tellers SET Tbalance=Tbalance+%ld WHERE Tid=%ld",
-          delta, Tid);
-  res = PQexec(myconn, query);
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-    PQclear(res);
-    PQfinish(myconn);
-    exit(1);
-  }
-  sprintf(query, "UPDATE branches SET Bbalance=Bbalance+%ld WHERE Bid=%ld",
-          delta, Bid);
-  res = PQexec(myconn, query);
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-    PQclear(res);
-    PQfinish(myconn);
-    exit(1);
-  }
+    PGresult *myres = PQexec(myconn, "BEGIN");
+    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    {
+        fprintf(stderr, "Query 1 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
+    sprintf(query, "UPDATE accounts SET Abalance=Abalance+%ld WHERE Aid=%ld",
+            delta, Aid);
+    myres = PQexec(myconn, query);
+    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    {
+        fprintf(stderr, "Query 2 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
+    
+    sprintf(query, "SELECT Abalance FROM accounts WHERE Aid=%ld", Aid);
+    myres = PQexec(myconn, query);
+    if (PQresultStatus(myres) != PGRES_TUPLES_OK)
+    {
+        fprintf(stderr, "Query 3 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
+     if (PQntuples(myres) > 0) {
+        Abalance = atol(PQgetvalue(myres, 0, 0));
+    } else {
+        printf("No results found. in Aid=%ld\n", Aid);
+    }
 
-  sprintf(query,
-          "INSERT INTO history(Tid, Bid, Aid, delta, time) VALUES (%ld, %ld, "
-          "%ld, %ld, DATE '2006-01-01')",
-          Tid, Bid, Aid, delta);
-  res = PQexec(myconn, query);
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-    PQclear(res);
-    PQfinish(myconn);
-    exit(1);
-  }
+    sprintf(query, "UPDATE tellers SET Tbalance=Tbalance+%ld WHERE Tid=%ld",
+            delta, Tid);
+    myres = PQexec(myconn, query);
+    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    {
+        fprintf(stderr, "Query 4 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
+    sprintf(query, "UPDATE branches SET Bbalance=Bbalance+%ld WHERE Bid=%ld",
+            delta, Bid);
+    myres = PQexec(myconn, query);
+    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    {
+        fprintf(stderr, "Query 5 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
 
-  res =
-      (error_exist == 'T') ? PQexec(myconn, "ROLLBACK") : PQexec(myconn, "COMMIT");
-  if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    fprintf(stderr, "Query execution failed: %s", PQerrorMessage(myconn));
-    PQclear(res);
-    PQfinish(myconn);
-    exit(1);
-  }
+    sprintf(query,
+            "INSERT INTO history(Tid, Bid, Aid, delta, time) VALUES (%ld, %ld, "
+            "%ld, %ld, DATE '2006-01-01')",
+            Tid, Bid, Aid, delta);
+    myres = PQexec(myconn, query);
+    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    {
+        fprintf(stderr, "Query 6 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
 
-  return Abalance;
+    myres =
+        (error_exist == 'T') ? PQexec(myconn, "ROLLBACK") : PQexec(myconn, "COMMIT");
+    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    {
+        fprintf(stderr, "Query 7 execution failed: %s", PQerrorMessage(myconn));
+        PQclear(myres);
+        PQfinish(myconn);
+        exit(1);
+    }
+
+    return Abalance;
 }
 
 // pthread_mutex_t mtx;
@@ -256,7 +264,7 @@ void *benchmark_database(void *arg)
         fprintf(stderr, "Failed to connect : %s\n", PQerrorMessage(conn));
         exit(1);
     }
-    
+
     while (running)
     {
         int rand_bid = rand_range(1, max_bid);
