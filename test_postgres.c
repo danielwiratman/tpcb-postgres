@@ -92,21 +92,21 @@ void init_database(int scaling_factor)
 
     fprintf(stderr, "Creating tables...");
     res = PQexec(conn, "CREATE TABLE branches(Bid NUMERIC(9), Bbalance "
-                       "NUMERIC(10), filler CHAR(88), PRIMARY KEY (Bid));");
+                       "eqpg_encrypted, filler CHAR(88), PRIMARY KEY (Bid));");
     res = PQexec(
         conn,
         "CREATE TABLE tellers(Tid NUMERIC(9), Bid NUMERIC(9), "
-        "Tbalance NUMERIC(10), filler CHAR(84), PRIMARY KEY "
+        "Tbalance eqpg_encrypted, filler CHAR(84), PRIMARY KEY "
         "(Tid), CONSTRAINT tbid FOREIGN KEY (Bid) REFERENCES branches(Bid));");
     res = PQexec(
         conn,
         "CREATE TABLE accounts(Aid NUMERIC(9), Bid NUMERIC(9), "
-        "Abalance NUMERIC(10), filler CHAR(84), PRIMARY KEY "
+        "Abalance eqpg_encrypted, filler CHAR(84), PRIMARY KEY "
         "(Aid), CONSTRAINT abid FOREIGN KEY (Bid) REFERENCES branches(Bid));");
     res = PQexec(
         conn,
         "CREATE TABLE history(Tid NUMERIC(9), Bid NUMERIC(9), Aid NUMERIC(9), "
-        "delta NUMERIC(10), time DATE, filler CHAR(22), CONSTRAINT htid FOREIGN "
+        "delta eqpg_encrypted, time DATE, filler CHAR(22), CONSTRAINT htid FOREIGN "
         "KEY (Tid) "
         "REFERENCES tellers(Tid), CONSTRAINT hbid FOREIGN KEY (Bid) REFERENCES "
         "branches(Bid), "
@@ -126,7 +126,7 @@ void init_database(int scaling_factor)
     {
         char *query;
         query = malloc(sizeof(char) * 100);
-        sprintf(query, "INSERT INTO branches(Bid, Bbalance) VALUES (%ld, 0)",
+        sprintf(query, "INSERT INTO branches(Bid, Bbalance) VALUES (%ld, '0')",
                 i + 1);
         res = PQexec(conn, query);
     }
@@ -135,7 +135,7 @@ void init_database(int scaling_factor)
         char *query;
         query = malloc(sizeof(char) * 100);
         sprintf(query,
-                "INSERT INTO tellers(Tid, Bid, Tbalance) VALUES (%ld, %ld, 0)",
+                "INSERT INTO tellers(Tid, Bid, Tbalance) VALUES (%ld, %ld, '0')",
                 i + 1, (i / ntellers) + 1);
         res = PQexec(conn, query);
     }
@@ -144,7 +144,7 @@ void init_database(int scaling_factor)
         char *query;
         query = malloc(sizeof(char) * 100);
         sprintf(query,
-                "INSERT INTO accounts(Aid, Bid, Abalance) VALUES (%ld, %ld, 0)",
+                "INSERT INTO accounts(Aid, Bid, Abalance) VALUES (%ld, %ld, '0')",
                 i + 1, (i / naccounts) + 1);
         res = PQexec(conn, query);
     }
@@ -175,7 +175,7 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
         PQfinish(myconn);
         exit(1);
     }
-    sprintf(query, "UPDATE accounts SET Abalance=Abalance+%ld WHERE Aid=%ld",
+    sprintf(query, "UPDATE accounts SET Abalance='%ld' WHERE Aid=%ld",
             delta, Aid);
     myres = PQexec(myconn, query);
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
@@ -201,7 +201,7 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
         printf("No results found. in Aid=%ld\n", Aid);
     }
 
-    sprintf(query, "UPDATE tellers SET Tbalance=Tbalance+%ld WHERE Tid=%ld",
+    sprintf(query, "UPDATE tellers SET Tbalance='%ld' WHERE Tid=%ld",
             delta, Tid);
     myres = PQexec(myconn, query);
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
@@ -211,7 +211,7 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
         PQfinish(myconn);
         exit(1);
     }
-    sprintf(query, "UPDATE branches SET Bbalance=Bbalance+%ld WHERE Bid=%ld",
+    sprintf(query, "UPDATE branches SET Bbalance='%ld' WHERE Bid=%ld",
             delta, Bid);
     myres = PQexec(myconn, query);
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
@@ -224,7 +224,7 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
 
     sprintf(query,
             "INSERT INTO history(Tid, Bid, Aid, delta, time) VALUES (%ld, %ld, "
-            "%ld, %ld, DATE '2006-01-01')",
+            "%ld, '%ld', DATE '2006-01-01')",
             Tid, Bid, Aid, delta);
     myres = PQexec(myconn, query);
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
