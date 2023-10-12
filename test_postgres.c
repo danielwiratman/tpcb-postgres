@@ -224,7 +224,7 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
 
     sprintf(query,
             "INSERT INTO history(Tid, Bid, Aid, delta, time) VALUES (%ld, %ld, "
-            "%ld, '%ld', DATE '2006-01-01')",
+            "%ld, '%ld', CURRENT_TIMESTAMP)",
             Tid, Bid, Aid, delta);
     myres = PQexec(myconn, query);
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
