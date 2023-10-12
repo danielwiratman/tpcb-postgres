@@ -84,33 +84,12 @@ void init_database(int scaling_factor)
     error_exist = 'F';
 
     fprintf(stderr, "Dropping tables if exists...");
-    res = PQexec(conn, "DROP TABLE IF EXISTS history;");
-    res = PQexec(conn, "DROP TABLE IF EXISTS accounts;");
-    res = PQexec(conn, "DROP TABLE IF EXISTS tellers;");
-    res = PQexec(conn, "DROP TABLE IF EXISTS branches;");
+    res = PQexec(conn, "DROP TABLE IF EXISTS idnameage;");
     fprintf(stderr, "DONE\n");
 
     fprintf(stderr, "Creating tables...");
-    res = PQexec(conn, "CREATE TABLE branches(Bid NUMERIC(9), Bbalance "
-                       "eqpg_encrypted, filler CHAR(88), PRIMARY KEY (Bid));");
-    res = PQexec(
-        conn,
-        "CREATE TABLE tellers(Tid NUMERIC(9), Bid NUMERIC(9), "
-        "Tbalance eqpg_encrypted, filler CHAR(84), PRIMARY KEY "
-        "(Tid), CONSTRAINT tbid FOREIGN KEY (Bid) REFERENCES branches(Bid));");
-    res = PQexec(
-        conn,
-        "CREATE TABLE accounts(Aid NUMERIC(9), Bid NUMERIC(9), "
-        "Abalance eqpg_encrypted, filler CHAR(84), PRIMARY KEY "
-        "(Aid), CONSTRAINT abid FOREIGN KEY (Bid) REFERENCES branches(Bid));");
-    res = PQexec(
-        conn,
-        "CREATE TABLE history(Tid NUMERIC(9), Bid NUMERIC(9), Aid NUMERIC(9), "
-        "delta eqpg_encrypted, time DATE, filler CHAR(22), CONSTRAINT htid FOREIGN "
-        "KEY (Tid) "
-        "REFERENCES tellers(Tid), CONSTRAINT hbid FOREIGN KEY (Bid) REFERENCES "
-        "branches(Bid), "
-        "CONSTRAINT haid FOREIGN KEY (Aid) REFERENCES accounts(Aid));");
+    res = PQexec(conn, "CREATE TABLE idnameage(id int primary key, name "
+                       "eqpg_encrypted, age int);");
     if (PQresultStatus(res) != PGRES_COMMAND_OK)
     {
         fprintf(stderr, "Query execution failed: %s", PQerrorMessage(conn));
@@ -120,32 +99,14 @@ void init_database(int scaling_factor)
     }
     fprintf(stderr, "DONE\n");
 
-    fprintf(stderr, "Inserting %ld branches, %ld tellers, and %ld accounts...",
+    fprintf(stderr, "Inserting %ld accounts...",
             nbranches, ntellers, naccounts);
     for (i = 0; i < nbranches * tps; i++)
     {
         char *query;
         query = malloc(sizeof(char) * 100);
-        sprintf(query, "INSERT INTO branches(Bid, Bbalance) VALUES (%ld, '0')",
+        sprintf(query, "INSERT INTO idnameage(id, name, age) VALUES (%ld, 'Paijo', 0)",
                 i + 1);
-        res = PQexec(conn, query);
-    }
-    for (i = 0; i < ntellers * tps; i++)
-    {
-        char *query;
-        query = malloc(sizeof(char) * 100);
-        sprintf(query,
-                "INSERT INTO tellers(Tid, Bid, Tbalance) VALUES (%ld, %ld, '0')",
-                i + 1, (i / ntellers) + 1);
-        res = PQexec(conn, query);
-    }
-    for (i = 0; i < naccounts * tps; i++)
-    {
-        char *query;
-        query = malloc(sizeof(char) * 100);
-        sprintf(query,
-                "INSERT INTO accounts(Aid, Bid, Abalance) VALUES (%ld, %ld, '0')",
-                i + 1, (i / naccounts) + 1);
         res = PQexec(conn, query);
     }
     fprintf(stderr, "DONE\n");
@@ -175,8 +136,8 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
         PQfinish(myconn);
         exit(1);
     }
-    sprintf(query, "UPDATE accounts SET Abalance='%ld' WHERE Aid=%ld",
-            delta, Aid);
+    sprintf(query, "UPDATE idnameage SET age=%ld WHERE id=%ld",
+            Tid, Bid);
     myres = PQexec(myconn, query);
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
     {
@@ -185,56 +146,6 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
         PQfinish(myconn);
         exit(1);
     }
-    
-    sprintf(query, "SELECT Abalance FROM accounts WHERE Aid=%ld", Aid);
-    myres = PQexec(myconn, query);
-    if (PQresultStatus(myres) != PGRES_TUPLES_OK)
-    {
-        fprintf(stderr, "Query 3 execution failed: %s", PQerrorMessage(myconn));
-        PQclear(myres);
-        PQfinish(myconn);
-        exit(1);
-    }
-     if (PQntuples(myres) > 0) {
-        Abalance = atol(PQgetvalue(myres, 0, 0));
-    } else {
-        printf("No results found. in Aid=%ld\n", Aid);
-    }
-
-    sprintf(query, "UPDATE tellers SET Tbalance='%ld' WHERE Tid=%ld",
-            delta, Tid);
-    myres = PQexec(myconn, query);
-    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
-    {
-        fprintf(stderr, "Query 4 execution failed: %s", PQerrorMessage(myconn));
-        PQclear(myres);
-        PQfinish(myconn);
-        exit(1);
-    }
-    sprintf(query, "UPDATE branches SET Bbalance='%ld' WHERE Bid=%ld",
-            delta, Bid);
-    myres = PQexec(myconn, query);
-    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
-    {
-        fprintf(stderr, "Query 5 execution failed: %s", PQerrorMessage(myconn));
-        PQclear(myres);
-        PQfinish(myconn);
-        exit(1);
-    }
-
-    sprintf(query,
-            "INSERT INTO history(Tid, Bid, Aid, delta, time) VALUES (%ld, %ld, "
-            "%ld, '%ld', CURRENT_TIMESTAMP)",
-            Tid, Bid, Aid, delta);
-    myres = PQexec(myconn, query);
-    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
-    {
-        fprintf(stderr, "Query 6 execution failed: %s", PQerrorMessage(myconn));
-        PQclear(myres);
-        PQfinish(myconn);
-        exit(1);
-    }
-
     myres =
         (error_exist == 'T') ? PQexec(myconn, "ROLLBACK") : PQexec(myconn, "COMMIT");
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
