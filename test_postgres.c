@@ -89,7 +89,7 @@ void init_database(int scaling_factor)
 
     fprintf(stderr, "Creating tables...");
     res = PQexec(conn, "CREATE TABLE idnameage(id int primary key, name "
-                       "eqpg_encrypted, age int);");
+                       "varchar(255), age int);");
     if (PQresultStatus(res) != PGRES_COMMAND_OK)
     {
         fprintf(stderr, "Query execution failed: %s", PQerrorMessage(conn));
