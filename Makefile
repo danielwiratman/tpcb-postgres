@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -lpthread -lm -ldl -lrt -lpq
+CFLAGS = -lpthread -lm -ldl -lrt -I /home/daniel/equnix-projects/eqpg-encrypt/postgresql-12.4/include -L /home/daniel/equnix-projects/eqpg-encrypt/postgresql-12.4/lib -lpq
 
 all: test_postgres
 
