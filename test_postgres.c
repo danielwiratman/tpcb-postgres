@@ -84,12 +84,11 @@ void init_database(int scaling_factor)
     error_exist = 'F';
 
     fprintf(stderr, "Dropping tables if exists...");
-    res = PQexec(conn, "DROP TABLE IF EXISTS idnameage;");
+    res = PQexec(conn, "DROP TABLE IF EXISTS bank_account;");
     fprintf(stderr, "DONE\n");
 
     fprintf(stderr, "Creating tables...");
-    res = PQexec(conn, "CREATE TABLE idnameage(id int primary key, name "
-                       "varchar(255), age int);");
+    res = PQexec(conn, "CREATE TABLE bank_account (id SERIAL PRIMARY KEY, full_name VARCHAR(255) NOT NULL, no_ktp eqpg_encrypted NOT NULL, balance NUMERIC(12, 2))");
     if (PQresultStatus(res) != PGRES_COMMAND_OK)
     {
         fprintf(stderr, "Query execution failed: %s", PQerrorMessage(conn));
@@ -99,14 +98,14 @@ void init_database(int scaling_factor)
     }
     fprintf(stderr, "DONE\n");
 
-    fprintf(stderr, "Inserting %ld accounts...",
+    fprintf(stderr, "Inserting %ld bank_accounts...",
             nbranches, ntellers, naccounts);
-    for (i = 0; i < nbranches * tps; i++)
+    for (i = 0; i < naccounts * tps; i++)
     {
         char *query;
         query = malloc(sizeof(char) * 100);
-        sprintf(query, "INSERT INTO idnameage(id, name, age) VALUES (%ld, 'Paijo', 0)",
-                i + 1);
+        sprintf(query, "INSERT INTO bank_account(full_name, no_ktp, balance) VALUES ('Test Name', '%ld', 0)",
+                i + 2308000000);
         res = PQexec(conn, query);
     }
     fprintf(stderr, "DONE\n");
@@ -136,16 +135,30 @@ long do_one(PGconn *myconn, long Bid, long Tid, long Aid, long delta)
         PQfinish(myconn);
         exit(1);
     }
-    sprintf(query, "UPDATE idnameage SET age=%ld WHERE id=%ld",
-            Tid, Bid);
+    sprintf(query, "SELECT full_name FROM bank_account WHERE no_ktp='%ld'", Aid + 2308000000);
     myres = PQexec(myconn, query);
-    if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    if (PQresultStatus(myres) != PGRES_TUPLES_OK)
     {
-        fprintf(stderr, "Query 2 execution failed: %s", PQerrorMessage(myconn));
+        fprintf(stderr, "Query 3 execution failed: %s", PQerrorMessage(myconn));
         PQclear(myres);
         PQfinish(myconn);
         exit(1);
     }
+     if (PQntuples(myres) > 0) {
+        Abalance = atol(PQgetvalue(myres, 0, 0));
+    } else {
+        printf("No results found. in Aid=%ld\n", Aid);
+    }
+    // sprintf(query, "UPDATE idnameage SET age=%ld WHERE id=%ld",
+    //         Tid, Bid);
+    // myres = PQexec(myconn, query);
+    // if (PQresultStatus(myres) != PGRES_COMMAND_OK)
+    // {
+    //     fprintf(stderr, "Query 2 execution failed: %s", PQerrorMessage(myconn));
+    //     PQclear(myres);
+    //     PQfinish(myconn);
+    //     exit(1);
+    // }
     myres =
         (error_exist == 'T') ? PQexec(myconn, "ROLLBACK") : PQexec(myconn, "COMMIT");
     if (PQresultStatus(myres) != PGRES_COMMAND_OK)
